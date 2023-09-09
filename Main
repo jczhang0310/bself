@@ -1,0 +1,72 @@
+
+import json
+import gspread
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from google.oauth2 import service_account
+
+SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+#important.json file
+SERVICE_ACCOUNT_FILE = 'bself-sheet-6f997362e357.json'
+
+#important spreadsheet id and credentials
+credentials = service_account.Credentials.from_service_account_file(
+    SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+spreadsheet_id = '1h-muguZb2M43A45V1dvmd6-WJ1w6fXYsjKcgaQGcDwI'
+
+#setup needed, open spreadsheet
+sa = gspread.service_account(filename = "bself-sheet-6f997362e357.json")
+sh = sa.open("bself project")
+service = build('sheets', 'v4', credentials=credentials)
+#define sheets to use, wks1 raw data, wks2 form
+wks1 = sh.worksheet("checkin list")
+wks2 = sh.worksheet("registration form")
+
+#get raw data from wks1
+wks1data = (wks1.get_all_records())
+target_data = []
+keys = ["Room No.", "チェックアウト日(Check out)","チェックイン日(Check in)","Room Charge","お名前 / Name"]
+for row in wks1data:
+    temp_disc = {}
+    for key, value in row.items():
+        if key in keys:
+            temp_disc[key] = value
+    if temp_disc:
+        target_data.append(temp_disc)
+
+
+#read field names dictionary for writing later
+headers = ["Room No.", "チェックアウト日(Check out)","チェックイン日(Check in)","Room Charge","お名前 / Name"]
+headers_location = {}
+for header in headers:
+    cell = wks2.find(header)
+    if cell:
+        headers_location[header] = (cell.row, cell.col)
+#write raw data into form
+for customer in target_data:
+    # Duplicate the form
+    newSheet = wks2.duplicate()
+    newSheet.update_title(customer['お名前 / Name'])
+
+    # Fill in the values from the customer data
+    for header, header_cell in headers_location.items():
+        if header == 'お名前 / Name':
+            row = header_cell[0]
+            col = header_cell[1] + 3
+            data = str(customer.get(header, ''))
+            newSheet.update_cell(row, col, data)
+        elif header == ('チェックイン日(Check in)'):
+            row = header_cell[0]
+            col = header_cell[1] + 2
+            data = str(customer.get(header, ''))
+            newSheet.update_cell(row, col, data)
+        elif header == ('チェックアウト日(Check out)'):
+            row = header_cell[0]
+            col = header_cell[1] + 2
+            data = str(customer.get(header, ''))
+            newSheet.update_cell(row, col, data)
+        else:
+            row = header_cell[0]
+            col = header_cell[1] + 1
+            data = str(customer.get(header, ''))
+            newSheet.update_cell(row, col, data)
